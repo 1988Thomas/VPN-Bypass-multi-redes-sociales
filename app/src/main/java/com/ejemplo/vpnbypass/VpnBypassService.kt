@@ -69,7 +69,7 @@ class VpnBypassService : VpnService() {
             isRunning = true
             startForeground(NOTIFICATION_ID, createNotification())
 
-            val fd = vpnInterface?.fileDescriptor ?: return
+            val fd = vpnInterface ?: return
             Thread(PacketForwarder(fd)).start()
         } catch (e: Exception) {
             e.printStackTrace()
@@ -96,8 +96,9 @@ class VpnBypassService : VpnService() {
     // -------------------------------------------------------------------------
     inner class PacketForwarder(private val fd: ParcelFileDescriptor) : Runnable {
         override fun run() {
-            val input = FileInputStream(fd)
-            val output = FileOutputStream(fd)
+            // Usamos fd.fileDescriptor para crear flujos
+            val input = FileInputStream(fd.fileDescriptor)
+            val output = FileOutputStream(fd.fileDescriptor)
             val buffer = ByteArray(32767)
 
             while (isRunning) {
@@ -128,11 +129,8 @@ class VpnBypassService : VpnService() {
                 val tcpDataLen = len - ipHeaderLen - 20 // cabecera TCP mÃ­nima 20 bytes
 
                 if (tcpDataLen > 0) {
-                    // Para simplificar, asumimos que es trÃ¡fico web y reenviamos a un proxy transparente
-                    // En una implementaciÃ³n real, aquÃ­ se redirigirÃ­a a un proxy o se reenviarÃ­a directamente.
-                    // Como demostraciÃ³n, simplemente escribimos de vuelta (lo que harÃ­a un bucle)
-                    // Mejor reenviar a Internet usando un socket protegido
-                    forwardTcpPacket(buffer, len, srcPort, dstPort, output)
+                    // Para demostraciÃ³n, reenviamos el paquete tal cual
+                    output.write(buffer, 0, len)
                 } else {
                     // ACK/SYN, lo enviamos de vuelta sin modificar
                     output.write(buffer, 0, len)
@@ -141,23 +139,12 @@ class VpnBypassService : VpnService() {
                 // UDP: extraer puertos y reenviar
                 val srcPort = ((buffer[ipHeaderLen].toInt() and 0xFF) shl 8) or (buffer[ipHeaderLen + 1].toInt() and 0xFF)
                 val dstPort = ((buffer[ipHeaderLen + 2].toInt() and 0xFF) shl 8) or (buffer[ipHeaderLen + 3].toInt() and 0xFF)
-                // Simplemente reenviamos el paquete UDP a travÃ©s de un socket protegido
-                forwardUdpPacket(buffer, len, srcPort, dstPort, output)
+                // Simplemente reenviamos el paquete UDP
+                output.write(buffer, 0, len)
             } else {
                 // Otros protocolos (ICMP, etc.) los reenviamos sin modificar
                 output.write(buffer, 0, len)
             }
-        }
-
-        private fun forwardTcpPacket(buffer: ByteArray, len: Int, srcPort: Int, dstPort: Int, output: FileOutputStream) {
-            // En una implementaciÃ³n completa, aquÃ­ se reenviarÃ­a a la IP destino.
-            // Para la demo, reenviamos el paquete a la misma interfaz (bucle).
-            output.write(buffer, 0, len)
-        }
-
-        private fun forwardUdpPacket(buffer: ByteArray, len: Int, srcPort: Int, dstPort: Int, output: FileOutputStream) {
-            // Igual: reenviamos tal cual para que la demo funcione.
-            output.write(buffer, 0, len)
         }
     }
 
