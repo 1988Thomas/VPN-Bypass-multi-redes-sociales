@@ -10,7 +10,6 @@ buildscript {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
-
 allprojects {
     repositories {
         google()
@@ -18,7 +17,6 @@ allprojects {
         maven { url 'https://jitpack.io' }
     }
 }
-
 task clean(type: Delete) {
     delete rootProject.buildDir
 }

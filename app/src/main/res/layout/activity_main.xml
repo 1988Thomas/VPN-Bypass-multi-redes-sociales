@@ -5,34 +5,49 @@
     android:orientation="vertical"
     android:gravity="center"
     android:padding="32dp">
-
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="VPN Bypass"
         android:textSize="24sp"
         android:textStyle="bold"
-        android:layout_marginBottom="16dp"/>
-
+        android:layout_marginBottom="8dp"/>
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Facebook · Instagram · TikTok · LinkedIn"
+        android:text="Facebook Â· Instagram Â· TikTok Â· LinkedIn"
         android:textSize="14sp"
-        android:layout_marginBottom="32dp"/>
-
+        android:layout_marginBottom="24dp"/>
+    <TextView
+        android:id="@+id/txtStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Buscando proxy..."
+        android:textSize="14sp"
+        android:gravity="center"
+        android:layout_marginBottom="16dp"/>
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:visibility="gone"/>
+    <Button
+        android:id="@+id/btnRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ðŸ”„ Buscar proxy"
+        android:layout_marginBottom="16dp"/>
     <Button
         android:id="@+id/btnStart"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Activar Bypass"
+        android:text="â–¶ Activar Bypass"
         android:layout_marginBottom="16dp"/>
-
     <Button
         android:id="@+id/btnStop"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Detener Bypass"
+        android:text="â¹ Detener Bypass"
         android:enabled="false"/>
-
 </LinearLayout>

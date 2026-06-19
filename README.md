@@ -1,18 +1,19 @@
-# VPN Bypass Multi-Redes Sociales
+# VPN Bypass con Proxy AutomÃ¡tico
 
-Aplicación Android que demuestra cómo una VPN local puede eludir bloqueos de red para **Facebook, Instagram, TikTok y LinkedIn** en un entorno controlado.
+AplicaciÃ³n Android que elude bloqueos de red usando proxies gratuitos obtenidos automÃ¡ticamente.
 
-## Funcionamiento
-- Filtra exclusivamente el tráfico de las apps de redes sociales seleccionadas.
-- Redirige el tráfico a través de `tun2socks` sin necesidad de root.
-- Al activar la VPN, todas las redes sociales navegan sin problemas aunque la red las bloquee.
-- Al detenerla, el bloqueo de red se restablece inmediatamente.
+## CaracterÃ­sticas
+- Busca proxies desde mÃºltiples fuentes (ProxyScrape, IPLocate, Thordata)
+- Prueba automÃ¡ticamente cada proxy hasta encontrar uno funcional
+- Redirige el trÃ¡fico de Facebook, Instagram, TikTok y LinkedIn
+- No requiere root ni servidores externos configurados por el usuario
 
-## Compilar APK (GitHub Actions)
-1. Sube este código a un repositorio público en GitHub.
-2. Ve a la pestaña **Actions**.
-3. Ejecuta el workflow **"Build APK"**.
-4. Descarga el APK desde los artefactos generados.
+## Uso
+1. Abre la app
+2. Espera a que encuentre un proxy (puedes pulsar "Buscar proxy" manualmente)
+3. Pulsa "Activar Bypass"
+4. Abre las redes sociales bloqueadas
+5. Pulsa "Detener Bypass" para volver al estado normal
 
-## Nota importante
-**Uso exclusivamente educativo** en entornos controlados con autorización.
+## Nota
+Los proxies gratuitos son volÃ¡tiles. Si deja de funcionar, busca otro.
