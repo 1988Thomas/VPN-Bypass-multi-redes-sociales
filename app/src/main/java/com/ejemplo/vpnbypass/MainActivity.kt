@@ -57,4 +57,12 @@ class MainActivity : AppCompatActivity() {
         btnStart.isEnabled = true
         btnStop.isEnabled = false
     }
+
+    // Cuando el usuario cierra la app desde el recents, detener el servicio tambiÃ©n
+    override fun onDestroy() {
+        super.onDestroy()
+        if (btnStop.isEnabled) {
+            stopVpnService()
+        }
+    }
 }

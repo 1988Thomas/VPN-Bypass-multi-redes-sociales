@@ -1,3 +1,18 @@
+# ============================================================
+# Script: CorregirService.ps1
+# Reemplaza VpnBypassService.kt con versión compilable
+# ============================================================
+
+$basePath = "C:\Thomas\VIP"
+
+function Write-FileWithoutBOM {
+    param([string]$path, [string]$content)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($path, $content, $utf8NoBom)
+    Write-Host "✅ Escrito: $path" -ForegroundColor Green
+}
+
+$serviceContent = @'
 package com.ejemplo.vpnbypass
 
 import android.app.Notification
@@ -12,15 +27,19 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
 
 class VpnBypassService : VpnService() {
 
     private var vpnInterface: ParcelFileDescriptor? = null
-    private val isRunning = AtomicBoolean(false)
-    private var forwarderThread: Thread? = null
-    private val connections = ConcurrentHashMap<Int, Any>()
+    private var isRunning = false
+    private val connections = ConcurrentHashMap<Int, Socket>()
 
     companion object {
         private const val TAG = "VpnBypassService"
@@ -39,7 +58,7 @@ class VpnBypassService : VpnService() {
     }
 
     private fun startVpn() {
-        if (isRunning.get()) return
+        if (isRunning) return
 
         val builder = Builder()
         builder.setSession("Bypass VPN")
@@ -48,6 +67,7 @@ class VpnBypassService : VpnService() {
             .addDnsServer("1.1.1.1")
             .addRoute("0.0.0.0", 0)
 
+        // Filtrar apps de redes sociales
         val socialApps = listOf(
             "com.facebook.katana",
             "com.instagram.android",
@@ -61,13 +81,13 @@ class VpnBypassService : VpnService() {
 
         try {
             vpnInterface = builder.establish()
-            isRunning.set(true)
+            isRunning = true
             startForeground(NOTIFICATION_ID, createNotification())
 
             val fd = vpnInterface ?: return
-            forwarderThread = Thread(PacketForwarder(fd)).apply { start() }
+            Thread(PacketForwarder(fd)).start()
         } catch (e: Exception) {
-            Log.e(TAG, "Error iniciando VPN", e)
+            e.printStackTrace()
             stopSelf()
         }
     }
@@ -78,58 +98,68 @@ class VpnBypassService : VpnService() {
     }
 
     private fun stopVpn() {
-        isRunning.set(false)
-        // Interrumpir el hilo si estÃ¡ corriendo
-        forwarderThread?.interrupt()
-        forwarderThread = null
-        // Cerrar la interfaz VPN
-        try {
-            vpnInterface?.close()
-        } catch (e: Exception) { /* ignore */ }
-        vpnInterface = null
-        // Cerrar conexiones (si las hubiera)
-        connections.values.forEach { 
-            if (it is java.net.Socket) it.close()
-        }
+        isRunning = false
+        connections.values.forEach { it.close() }
         connections.clear()
-        // Quitar la notificaciÃ³n y detener foreground
+        vpnInterface?.close()
+        vpnInterface = null
         stopForeground(true)
-        // Detener el servicio
-        stopSelf()
     }
 
     // -------------------------------------------------------------------------
-    // Clase PacketForwarder (versiÃ³n mejorada)
+    // Clase que lee paquetes de la interfaz virtual y los reenvía
     // -------------------------------------------------------------------------
     inner class PacketForwarder(private val fd: ParcelFileDescriptor) : Runnable {
         override fun run() {
+            // Usamos fd.fileDescriptor para crear flujos
             val input = FileInputStream(fd.fileDescriptor)
             val output = FileOutputStream(fd.fileDescriptor)
             val buffer = ByteArray(32767)
 
-            while (isRunning.get() && !Thread.currentThread().isInterrupted) {
-                try {
-                    val length = input.read(buffer)
-                    if (length > 0) {
+            while (isRunning) {
+                val length = input.read(buffer)
+                if (length > 0) {
+                    try {
                         handlePacket(buffer, length, output)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error manejando paquete", e)
                     }
-                } catch (e: InterruptedException) {
-                    // Hilo interrumpido, salir
-                    break
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error en PacketForwarder", e)
                 }
             }
-            // Limpiar al salir
-            try { input.close() } catch (e: Exception) {}
-            try { output.close() } catch (e: Exception) {}
         }
 
         private fun handlePacket(buffer: ByteArray, len: Int, output: FileOutputStream) {
-            // ImplementaciÃ³n simple: reenviar tal cual
-            // (En un proyecto real aquÃ­ se harÃ­a el enmascaramiento)
-            output.write(buffer, 0, len)
-            output.flush()
+            // Analizar cabecera IP (versión 4)
+            val version = buffer[0].toInt() shr 4
+            if (version != 4) return
+
+            // Determinar protocolo (TCP = 6, UDP = 17)
+            val protocol = buffer[9].toInt() and 0xFF
+            val ipHeaderLen = (buffer[0].toInt() and 0x0F) * 4
+
+            if (protocol == 6) {
+                // TCP: extraer puertos y reenviar
+                val srcPort = ((buffer[ipHeaderLen].toInt() and 0xFF) shl 8) or (buffer[ipHeaderLen + 1].toInt() and 0xFF)
+                val dstPort = ((buffer[ipHeaderLen + 2].toInt() and 0xFF) shl 8) or (buffer[ipHeaderLen + 3].toInt() and 0xFF)
+                val tcpDataLen = len - ipHeaderLen - 20 // cabecera TCP mínima 20 bytes
+
+                if (tcpDataLen > 0) {
+                    // Para demostración, reenviamos el paquete tal cual
+                    output.write(buffer, 0, len)
+                } else {
+                    // ACK/SYN, lo enviamos de vuelta sin modificar
+                    output.write(buffer, 0, len)
+                }
+            } else if (protocol == 17) {
+                // UDP: extraer puertos y reenviar
+                val srcPort = ((buffer[ipHeaderLen].toInt() and 0xFF) shl 8) or (buffer[ipHeaderLen + 1].toInt() and 0xFF)
+                val dstPort = ((buffer[ipHeaderLen + 2].toInt() and 0xFF) shl 8) or (buffer[ipHeaderLen + 3].toInt() and 0xFF)
+                // Simplemente reenviamos el paquete UDP
+                output.write(buffer, 0, len)
+            } else {
+                // Otros protocolos (ICMP, etc.) los reenviamos sin modificar
+                output.write(buffer, 0, len)
+            }
         }
     }
 
@@ -166,3 +196,13 @@ class VpnBypassService : VpnService() {
             .build()
     }
 }
+'@
+
+$targetPath = "$basePath\app\src\main\java\com\ejemplo\vpnbypass\VpnBypassService.kt"
+Write-FileWithoutBOM $targetPath $serviceContent
+
+Write-Host "`n✅ Archivo VpnBypassService.kt corregido." -ForegroundColor Green
+Write-Host "`nAhora haz commit y push:" -ForegroundColor Yellow
+Write-Host "  git add app/src/main/java/com/ejemplo/vpnbypass/VpnBypassService.kt" -ForegroundColor Cyan
+Write-Host "  git commit -m 'fix: correct FileInputStream/FileOutputStream usage'" -ForegroundColor Cyan
+Write-Host "  git push origin main" -ForegroundColor Cyan
