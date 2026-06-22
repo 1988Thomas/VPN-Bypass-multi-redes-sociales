@@ -5,7 +5,7 @@ import org.json.JSONArray
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
-import java.net.Proxy
+import java.net.InetSocketAddress
 import java.net.URL
 
 class ProxyManager {
@@ -91,7 +91,8 @@ class ProxyManager {
     
     suspend fun testProxy(proxy: Proxy, testUrl: String = "https://httpbin.org/ip", timeoutMs: Int = 5000): Boolean {
         return try {
-            val javaProxy = Proxy(Proxy.Type.HTTP, java.net.InetSocketAddress(proxy.ip, proxy.port))
+            // Usar nombre completo para evitar conflicto con nuestra clase Proxy
+            val javaProxy = java.net.Proxy(java.net.Proxy.Type.HTTP, java.net.InetSocketAddress(proxy.ip, proxy.port))
             val url = URL(testUrl)
             val connection = url.openConnection(javaProxy) as HttpURLConnection
             connection.connectTimeout = timeoutMs
