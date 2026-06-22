@@ -33,6 +33,5 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
-    // Usamos la versiÃ³n mÃ¡s reciente disponible en el repositorio de SagerNet
-    implementation 'io.nekohasekai.sagernet:tun2socks:1.6.0'
+    implementation 'io.nekohasekai.sagernet:tun2socks:1.4.0'
 }

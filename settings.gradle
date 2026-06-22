@@ -5,6 +5,7 @@ pluginManagement {
         gradlePluginPortal()
         maven { url 'https://jitpack.io' }
         maven { url 'https://sagernet.org/maven/' }
+        maven { url 'https://maven.sagernet.org/' }
     }
 }
 dependencyResolutionManagement {
@@ -14,6 +15,7 @@ dependencyResolutionManagement {
         mavenCentral()
         maven { url 'https://jitpack.io' }
         maven { url 'https://sagernet.org/maven/' }
+        maven { url 'https://maven.sagernet.org/' }
     }
 }
 rootProject.name = "VpnBypass"
