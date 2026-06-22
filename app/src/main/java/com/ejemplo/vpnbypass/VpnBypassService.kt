@@ -23,15 +23,18 @@ class VpnBypassService : VpnService() {
     private val connections = ConcurrentHashMap<Int, Any>()
     private var proxyHost: String = ""
     private var proxyPort: Int = 0
+
     companion object {
         private const val TAG = "VpnBypassService"
         private const val NOTIFICATION_ID = 1
         private const val CHANNEL_ID = "vpn_channel"
     }
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
     }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         intent?.let {
             proxyHost = it.getStringExtra("PROXY_HOST") ?: ""
@@ -45,6 +48,7 @@ class VpnBypassService : VpnService() {
         startVpn()
         return START_STICKY
     }
+
     private fun startVpn() {
         if (isRunning.get()) return
         val builder = Builder()
@@ -53,9 +57,11 @@ class VpnBypassService : VpnService() {
             .addDnsServer("8.8.8.8")
             .addDnsServer("1.1.1.1")
             .addRoute("0.0.0.0", 0)
+
         val proxyInfo = ProxyInfo.buildDirectProxy(proxyHost, proxyPort)
         builder.setHttpProxy(proxyInfo)
         Log.i(TAG, "Proxy configurado: ${proxyHost}:${proxyPort}")
+
         val socialApps = listOf(
             "com.facebook.katana",
             "com.instagram.android",
@@ -65,6 +71,7 @@ class VpnBypassService : VpnService() {
         socialApps.forEach { pkg ->
             try { builder.addAllowedApplication(pkg) } catch (e: Exception) { /* app no instalada */ }
         }
+
         try {
             vpnInterface = builder.establish()
             isRunning.set(true)
@@ -76,10 +83,12 @@ class VpnBypassService : VpnService() {
             stopSelf()
         }
     }
+
     override fun onDestroy() {
         super.onDestroy()
         stopVpn()
     }
+
     private fun stopVpn() {
         isRunning.set(false)
         forwarderThread?.interrupt()
@@ -91,6 +100,7 @@ class VpnBypassService : VpnService() {
         stopForeground(true)
         stopSelf()
     }
+
     inner class PacketForwarder(private val fd: ParcelFileDescriptor) : Runnable {
         override fun run() {
             val input = FileInputStream(fd.fileDescriptor)
@@ -107,6 +117,7 @@ class VpnBypassService : VpnService() {
             try { output.close() } catch (_: Exception) {}
         }
     }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(CHANNEL_ID, "VPN Bypass", NotificationManager.IMPORTANCE_LOW)
@@ -115,6 +126,7 @@ class VpnBypassService : VpnService() {
             manager.createNotificationChannel(channel)
         }
     }
+
     private fun createNotification(): Notification {
         val intent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)

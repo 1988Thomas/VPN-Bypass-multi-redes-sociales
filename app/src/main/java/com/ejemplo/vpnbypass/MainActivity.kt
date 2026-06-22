@@ -16,18 +16,25 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRefresh: Button
     private lateinit var txtStatus: TextView
     private lateinit var progressBar: ProgressBar
+
     private var currentProxy: ProxyManager.Proxy? = null
-    private val proxyManager = ProxyManager()
+    private lateinit var proxyManager: ProxyManager
     private val scope = CoroutineScope(Dispatchers.Main + Job())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        proxyManager = ProxyManager(this)
+
         btnStart = findViewById(R.id.btnStart)
         btnStop = findViewById(R.id.btnStop)
         btnRefresh = findViewById(R.id.btnRefresh)
         txtStatus = findViewById(R.id.txtStatus)
         progressBar = findViewById(R.id.progressBar)
+
         btnRefresh.setOnClickListener { buscarProxy() }
+
         btnStart.setOnClickListener {
             if (currentProxy == null) {
                 Toast.makeText(this, "Primero busca un proxy valido", Toast.LENGTH_SHORT).show()
@@ -37,48 +44,58 @@ class MainActivity : AppCompatActivity() {
             if (intent == null) startVpnService()
             else startActivityForResult(intent, 100)
         }
+
         btnStop.setOnClickListener { stopVpnService() }
+
+        // Iniciar bÃºsqueda al abrir
         buscarProxy()
     }
+
     private fun buscarProxy() {
         progressBar.visibility = android.view.View.VISIBLE
-        txtStatus.text = "Buscando proxies disponibles..."
+        txtStatus.text = "Buscando proxy..."
         btnRefresh.isEnabled = false
+
         scope.launch {
-            val proxies = proxyManager.fetchProxies(limit = 30)
-            if (proxies.isEmpty()) {
-                withContext(Dispatchers.Main) {
-                    txtStatus.text = "No se encontraron proxies. Intenta de nuevo."
-                    progressBar.visibility = android.view.View.GONE
-                    btnRefresh.isEnabled = true
-                }
-                return@launch
+            // Verificar si toca renovar la lista fija
+            if (proxyManager.shouldRenewProxies()) {
+                txtStatus.text = "Renovando lista de proxies fijos..."
+                proxyManager.renewFixedProxies()
             }
-            var workingProxy: ProxyManager.Proxy? = null
-            txtStatus.text = "Probando ${proxies.size} proxies..."
-            for (proxy in proxies) {
-                txtStatus.text = "Probando ${proxy.ip}:${proxy.port}..."
-                if (proxyManager.testProxy(proxy)) { workingProxy = proxy; break }
-            }
+
+            // Obtener proxy funcional (usa fijos primero)
+            val proxy = proxyManager.getWorkingProxy()
+
             withContext(Dispatchers.Main) {
                 progressBar.visibility = android.view.View.GONE
                 btnRefresh.isEnabled = true
-                if (workingProxy != null) {
-                    currentProxy = workingProxy
-                    txtStatus.text = "Proxy activo: ${workingProxy.ip}:${workingProxy.port}"
-                    Toast.makeText(this@MainActivity, "Proxy encontrado: ${workingProxy.ip}:${workingProxy.port}", Toast.LENGTH_SHORT).show()
+
+                if (proxy != null) {
+                    currentProxy = proxy
+                    txtStatus.text = "Proxy activo: ${proxy.ip}:${proxy.port}"
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Proxy encontrado: ${proxy.ip}:${proxy.port}",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 } else {
-                    txtStatus.text = "Ningun proxy funciono. Intenta refrescar."
-                    Toast.makeText(this@MainActivity, "No se encontraron proxies funcionales", Toast.LENGTH_SHORT).show()
+                    txtStatus.text = "No se encontraron proxies funcionales"
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Intenta de nuevo mas tarde",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
     }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 100 && resultCode == RESULT_OK) startVpnService()
         else Toast.makeText(this, "Permiso VPN denegado", Toast.LENGTH_SHORT).show()
     }
+
     private fun startVpnService() {
         val proxy = currentProxy ?: return
         val intent = Intent(this, VpnBypassService::class.java).apply {
@@ -90,6 +107,7 @@ class MainActivity : AppCompatActivity() {
         btnStart.isEnabled = false
         btnStop.isEnabled = true
     }
+
     private fun stopVpnService() {
         val intent = Intent(this, VpnBypassService::class.java)
         stopService(intent)
@@ -97,6 +115,7 @@ class MainActivity : AppCompatActivity() {
         btnStart.isEnabled = true
         btnStop.isEnabled = false
     }
+
     override fun onDestroy() {
         super.onDestroy()
         scope.cancel()
