@@ -19,13 +19,18 @@ class ProxyManager(context: Context) {
         private const val KEY_LAST_UPDATE = "last_update"
         private const val VALIDITY_DAYS = 30
 
-        // Lista inicial de 5 proxies gratuitos conocidos
+        // 10 proxies fijos conocidos (mÃ¡s opciones)
         private val DEFAULT_PROXIES = listOf(
             "104.248.57.207:3128",
             "72.10.160.170:46155",
             "188.166.242.57:3128",
             "51.79.94.200:8080",
-            "80.78.23.49:8080"
+            "80.78.23.49:8080",
+            "139.59.1.14:3128",
+            "45.76.222.8:8080",
+            "159.89.129.14:3128",
+            "178.128.147.73:3128",
+            "159.65.8.36:8080"
         )
 
         private val PROXY_SOURCES = listOf(
@@ -43,18 +48,19 @@ class ProxyManager(context: Context) {
     // ----- Obtener proxy funcional (primero fijos, luego buscar) -----
     suspend fun getWorkingProxy(): Proxy? {
         val fixed = getFixedProxies()
-        // Probar proxies fijos en orden
+        // Probar proxies fijos en orden, con timeout mÃ¡s corto
         for (proxy in fixed) {
-            if (testProxy(proxy)) {
+            Log.d(TAG, "Probando proxy fijo: ${proxy.ip}:${proxy.port}")
+            if (testProxy(proxy, timeoutMs = 4000)) {
                 Log.i(TAG, "Proxy fijo funciona: ${proxy.ip}:${proxy.port}")
                 return proxy
             }
         }
         // Si todos fallan, buscar proxies automÃ¡ticamente
         Log.i(TAG, "NingÃºn proxy fijo funciona, buscando automÃ¡ticamente...")
-        val proxies = fetchProxies(limit = 30)
+        val proxies = fetchProxies(limit = 20)
         for (proxy in proxies) {
-            if (testProxy(proxy)) {
+            if (testProxy(proxy, timeoutMs = 4000)) {
                 // Guardar como nuevo proxy fijo (renovar lista)
                 saveBestProxies(proxies)
                 return proxy
@@ -109,10 +115,10 @@ class ProxyManager(context: Context) {
 
     // ----- Forzar renovaciÃ³n de proxies fijos -----
     suspend fun renewFixedProxies() {
-        val proxies = fetchProxies(limit = 30)
+        val proxies = fetchProxies(limit = 20)
         val working = mutableListOf<Proxy>()
         for (p in proxies) {
-            if (testProxy(p)) {
+            if (testProxy(p, timeoutMs = 4000)) {
                 working.add(p)
                 if (working.size >= 5) break
             }
@@ -123,7 +129,7 @@ class ProxyManager(context: Context) {
     }
 
     // ----- Obtener proxies desde fuentes -----
-    suspend fun fetchProxies(limit: Int = 30, timeoutMs: Int = 8000): List<Proxy> {
+    suspend fun fetchProxies(limit: Int = 20, timeoutMs: Int = 8000): List<Proxy> {
         val allProxies = mutableListOf<Proxy>()
         for (source in PROXY_SOURCES) {
             try {
@@ -191,8 +197,8 @@ class ProxyManager(context: Context) {
         return proxies
     }
 
-    // ----- Probar proxy -----
-    suspend fun testProxy(proxy: Proxy, testUrl: String = "https://httpbin.org/ip", timeoutMs: Int = 8000): Boolean {
+    // ----- Probar proxy con timeout configurable -----
+    suspend fun testProxy(proxy: Proxy, testUrl: String = "https://httpbin.org/ip", timeoutMs: Int = 4000): Boolean {
         return try {
             val javaProxy = java.net.Proxy(java.net.Proxy.Type.HTTP, InetSocketAddress(proxy.ip, proxy.port))
             val url = URL(testUrl)
@@ -204,6 +210,7 @@ class ProxyManager(context: Context) {
             connection.disconnect()
             responseCode in 200..299
         } catch (e: Exception) {
+            Log.d(TAG, "Proxy ${proxy.ip}:${proxy.port} fallÃ³: ${e.message}")
             false
         }
     }

@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity() {
         btnStop.setOnClickListener { stopVpnService() }
 
         // Iniciar bÃºsqueda al abrir
+        txtStatus.text = "Iniciando..."
         buscarProxy()
     }
 
@@ -57,34 +58,43 @@ class MainActivity : AppCompatActivity() {
         btnRefresh.isEnabled = false
 
         scope.launch {
-            // Verificar si toca renovar la lista fija
-            if (proxyManager.shouldRenewProxies()) {
-                txtStatus.text = "Renovando lista de proxies fijos..."
-                proxyManager.renewFixedProxies()
-            }
+            try {
+                // Verificar si toca renovar la lista fija
+                if (proxyManager.shouldRenewProxies()) {
+                    txtStatus.text = "Renovando lista de proxies fijos..."
+                    proxyManager.renewFixedProxies()
+                }
 
-            // Obtener proxy funcional (usa fijos primero)
-            val proxy = proxyManager.getWorkingProxy()
+                // Obtener proxy funcional (usa fijos primero)
+                val proxy = proxyManager.getWorkingProxy()
 
-            withContext(Dispatchers.Main) {
-                progressBar.visibility = android.view.View.GONE
-                btnRefresh.isEnabled = true
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = android.view.View.GONE
+                    btnRefresh.isEnabled = true
 
-                if (proxy != null) {
-                    currentProxy = proxy
-                    txtStatus.text = "Proxy activo: ${proxy.ip}:${proxy.port}"
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Proxy encontrado: ${proxy.ip}:${proxy.port}",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } else {
-                    txtStatus.text = "No se encontraron proxies funcionales"
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Intenta de nuevo mas tarde",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    if (proxy != null) {
+                        currentProxy = proxy
+                        txtStatus.text = "Proxy activo: ${proxy.ip}:${proxy.port}"
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Proxy encontrado: ${proxy.ip}:${proxy.port}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        txtStatus.text = "No se encontraron proxies funcionales"
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Intenta de nuevo mÃ¡s tarde",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = android.view.View.GONE
+                    btnRefresh.isEnabled = true
+                    txtStatus.text = "Error: ${e.message}"
+                    Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
