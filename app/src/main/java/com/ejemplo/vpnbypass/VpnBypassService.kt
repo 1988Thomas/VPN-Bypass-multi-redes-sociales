@@ -5,22 +5,18 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
-import android.net.ProxyInfo
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.util.concurrent.ConcurrentHashMap
+import io.nekohasekai.sagernet.tun2socks.Tun2socks
 import java.util.concurrent.atomic.AtomicBoolean
 
 class VpnBypassService : VpnService() {
+
     private var vpnInterface: ParcelFileDescriptor? = null
     private val isRunning = AtomicBoolean(false)
-    private var forwarderThread: Thread? = null
-    private val connections = ConcurrentHashMap<Int, Any>()
     private var proxyHost: String = ""
     private var proxyPort: Int = 0
 
@@ -51,16 +47,13 @@ class VpnBypassService : VpnService() {
 
     private fun startVpn() {
         if (isRunning.get()) return
+
         val builder = Builder()
-        builder.setSession("Bypass VPN")
+        builder.setSession("Bypass VPN (SOCKS5)")
             .addAddress("192.168.1.1", 24)
             .addDnsServer("8.8.8.8")
             .addDnsServer("1.1.1.1")
             .addRoute("0.0.0.0", 0)
-
-        val proxyInfo = ProxyInfo.buildDirectProxy(proxyHost, proxyPort)
-        builder.setHttpProxy(proxyInfo)
-        Log.i(TAG, "Proxy configurado: ${proxyHost}:${proxyPort}")
 
         val socialApps = listOf(
             "com.facebook.katana",
@@ -76,8 +69,28 @@ class VpnBypassService : VpnService() {
             vpnInterface = builder.establish()
             isRunning.set(true)
             startForeground(NOTIFICATION_ID, createNotification())
+
             val fd = vpnInterface ?: return
-            forwarderThread = Thread(PacketForwarder(fd)).apply { start() }
+            val fdInt = fd.fileDescriptor
+
+            // Iniciar tun2socks con el proxy SOCKS5
+            // ParÃ¡metros: fileDescriptor, socks5Server, mtu, dns, timeout
+            val result = Tun2socks.start(
+                fdInt,
+                "$proxyHost:$proxyPort",  // Servidor SOCKS5
+                1500,                      // MTU
+                "8.8.8.8,1.1.1.1",        // DNS
+                10000                      // Timeout ms
+            )
+
+            if (result != 0) {
+                Log.e(TAG, "Error al iniciar tun2socks: $result")
+                stopSelf()
+                return
+            }
+
+            Log.i(TAG, "tun2socks iniciado correctamente con proxy $proxyHost:$proxyPort")
+
         } catch (e: Exception) {
             Log.e(TAG, "Error iniciando VPN", e)
             stopSelf()
@@ -91,37 +104,23 @@ class VpnBypassService : VpnService() {
 
     private fun stopVpn() {
         isRunning.set(false)
-        forwarderThread?.interrupt()
-        forwarderThread = null
-        try { vpnInterface?.close() } catch (e: Exception) {}
+        try {
+            Tun2socks.stop()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deteniendo tun2socks", e)
+        }
+        try {
+            vpnInterface?.close()
+        } catch (e: Exception) {}
         vpnInterface = null
-        connections.values.forEach { if (it is java.net.Socket) it.close() }
-        connections.clear()
         stopForeground(true)
         stopSelf()
-    }
-
-    inner class PacketForwarder(private val fd: ParcelFileDescriptor) : Runnable {
-        override fun run() {
-            val input = FileInputStream(fd.fileDescriptor)
-            val output = FileOutputStream(fd.fileDescriptor)
-            val buffer = ByteArray(32767)
-            while (isRunning.get() && !Thread.currentThread().isInterrupted) {
-                try {
-                    val length = input.read(buffer)
-                    if (length > 0) { output.write(buffer, 0, length); output.flush() }
-                } catch (e: InterruptedException) { break }
-                catch (e: Exception) { Log.e(TAG, "Error en PacketForwarder", e) }
-            }
-            try { input.close() } catch (_: Exception) {}
-            try { output.close() } catch (_: Exception) {}
-        }
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(CHANNEL_ID, "VPN Bypass", NotificationManager.IMPORTANCE_LOW)
-            channel.description = "Redirige trÃ¡fico a travÃ©s de proxy"
+            channel.description = "Redirige trÃ¡fico a travÃ©s de proxy SOCKS5"
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
         }
@@ -132,7 +131,7 @@ class VpnBypassService : VpnService() {
         val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("VPN Bypass activa")
-            .setContentText("Usando proxy ${proxyHost}:${proxyPort}")
+            .setContentText("SOCKS5: ${proxyHost}:${proxyPort}")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)

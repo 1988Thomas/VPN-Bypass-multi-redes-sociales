@@ -8,6 +8,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.URL
 import java.util.Calendar
 
@@ -20,67 +21,36 @@ class ProxyManager(context: Context) {
         private const val KEY_MANUAL_PROXY = "manual_proxy"
         private const val VALIDITY_DAYS = 30
 
-        // Lista ampliada de 20 proxies fijos (actualizados manualmente)
+        // Lista de proxies SOCKS5 gratuitos conocidos (actualizados manualmente con fuentes pÃºblicas)
         private val DEFAULT_PROXIES = listOf(
-            "104.248.57.207:3128",
-            "72.10.160.170:46155",
-            "188.166.242.57:3128",
-            "51.79.94.200:8080",
-            "80.78.23.49:8080",
-            "139.59.1.14:3128",
-            "45.76.222.8:8080",
-            "159.89.129.14:3128",
-            "178.128.147.73:3128",
-            "159.65.8.36:8080",
-            "138.197.91.166:3128",
-            "165.227.86.40:3128",
-            "167.172.165.215:3128",
-            "134.209.98.171:3128",
-            "206.189.144.45:3128",
-            "157.230.249.82:3128",
-            "159.203.17.180:3128",
-            "192.241.149.218:3128",
-            "188.166.239.248:3128",
-            "159.89.230.232:3128"
+            "51.79.94.200:1080",    // SOCKS5
+            "80.78.23.49:1080",     // SOCKS5
+            "139.59.1.14:1080",     // SOCKS5
+            "45.76.222.8:1080",     // SOCKS5
+            "159.89.129.14:1080",   // SOCKS5
+            "178.128.147.73:1080",  // SOCKS5
+            "159.65.8.36:1080",     // SOCKS5
+            "134.209.98.171:1080",  // SOCKS5
+            "157.230.249.82:1080",  // SOCKS5
+            "165.227.86.40:1080"    // SOCKS5
         )
 
+        // Fuentes de listas de proxies SOCKS5 gratuitos
         private val PROXY_SOURCES = listOf(
-            "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies`&proxy_format=protocolipport`&format=json",
-            "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies`&proxy_format=protocolipport`&format=text",
-            "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/http.txt",
-            "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/https.txt",
-            "https://raw.githubusercontent.com/Thordata/awesome-free-proxy-list/main/proxies/all.txt"
+            "https://raw.githubusercontent.com/iptv-org/epg/master/sites/socks5.txt",
+            "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt",
+            "https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/socks5.txt"
         )
     }
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    data class Proxy(val ip: String, val port: Int, val protocol: String = "http")
+    data class Proxy(val ip: String, val port: Int, val protocol: String = "socks5")
 
-    // ----- Guardar proxy manual -----
-    fun saveManualProxy(proxy: Proxy) {
-        val value = "${proxy.ip}:${proxy.port}"
-        prefs.edit().putString(KEY_MANUAL_PROXY, value).apply()
-    }
-
-    // ----- Obtener proxy manual guardado -----
-    fun getManualProxy(): Proxy? {
-        val raw = prefs.getString(KEY_MANUAL_PROXY, null)
-        if (raw != null) {
-            val parts = raw.split(":")
-            if (parts.size == 2) {
-                val ip = parts[0].trim()
-                val port = parts[1].trim().toIntOrNull()
-                if (ip.isNotEmpty() && port != null) return Proxy(ip, port)
-            }
-        }
-        return null
-    }
-
-    // ----- Obtener proxy funcional (manual > fijos > bÃºsqueda) -----
+    // ----- Obtener proxy funcional -----
     suspend fun getWorkingProxy(): Proxy? {
         // 1. Probar proxy manual si existe
         getManualProxy()?.let { manual ->
-            if (testProxy(manual, timeoutMs = 5000)) {
+            if (testProxy(manual)) {
                 Log.i(TAG, "Proxy manual funciona: ${manual.ip}:${manual.port}")
                 return manual
             }
@@ -89,17 +59,17 @@ class ProxyManager(context: Context) {
         // 2. Probar proxies fijos guardados o por defecto
         val fixed = getFixedProxies()
         for (proxy in fixed) {
-            if (testProxy(proxy, timeoutMs = 5000)) {
+            if (testProxy(proxy)) {
                 Log.i(TAG, "Proxy fijo funciona: ${proxy.ip}:${proxy.port}")
                 return proxy
             }
         }
 
-        // 3. Buscar automÃ¡ticamente si todo falla
-        Log.i(TAG, "Buscando proxies automÃ¡ticamente...")
+        // 3. Buscar automÃ¡ticamente
+        Log.i(TAG, "Buscando proxies SOCKS5 automÃ¡ticamente...")
         val proxies = fetchProxies(limit = 20)
         for (proxy in proxies) {
-            if (testProxy(proxy, timeoutMs = 5000)) {
+            if (testProxy(proxy)) {
                 saveBestProxies(proxies)
                 return proxy
             }
@@ -116,7 +86,8 @@ class ProxyManager(context: Context) {
                 if (parts.size == 2) {
                     val ip = parts[0].trim()
                     val port = parts[1].trim().toIntOrNull()
-                    if (ip.isNotEmpty() && port != null) Proxy(ip, port) else null
+                    if (ip.isNotEmpty() && port != null) Proxy(ip, port)
+                    else null
                 } else null
             }
             if (list.isNotEmpty()) return list
@@ -131,7 +102,25 @@ class ProxyManager(context: Context) {
         }
     }
 
-    // ----- Guardar los mejores proxies -----
+    // ----- Guardar proxy manual -----
+    fun saveManualProxy(proxy: Proxy) {
+        val value = "${proxy.ip}:${proxy.port}"
+        prefs.edit().putString(KEY_MANUAL_PROXY, value).apply()
+    }
+
+    fun getManualProxy(): Proxy? {
+        val raw = prefs.getString(KEY_MANUAL_PROXY, null)
+        if (raw != null) {
+            val parts = raw.split(":")
+            if (parts.size == 2) {
+                val ip = parts[0].trim()
+                val port = parts[1].trim().toIntOrNull()
+                if (ip.isNotEmpty() && port != null) return Proxy(ip, port)
+            }
+        }
+        return null
+    }
+
     private fun saveBestProxies(proxies: List<Proxy>) {
         val best = proxies.take(5).map { "${it.ip}:${it.port}" }.joinToString(",")
         prefs.edit().putString(KEY_FIXED_PROXIES, best).apply()
@@ -139,7 +128,6 @@ class ProxyManager(context: Context) {
         Log.i(TAG, "Proxies fijos actualizados: $best")
     }
 
-    // ----- Verificar renovaciÃ³n (30 dÃ­as) -----
     fun shouldRenewProxies(): Boolean {
         val lastUpdate = prefs.getLong(KEY_LAST_UPDATE, 0)
         if (lastUpdate == 0L) return true
@@ -149,12 +137,11 @@ class ProxyManager(context: Context) {
         return System.currentTimeMillis() > cal.timeInMillis
     }
 
-    // ----- Renovar proxies fijos -----
     suspend fun renewFixedProxies() {
         val proxies = fetchProxies(limit = 20)
         val working = mutableListOf<Proxy>()
         for (p in proxies) {
-            if (testProxy(p, timeoutMs = 5000)) {
+            if (testProxy(p)) {
                 working.add(p)
                 if (working.size >= 5) break
             }
@@ -162,7 +149,7 @@ class ProxyManager(context: Context) {
         if (working.isNotEmpty()) saveBestProxies(working)
     }
 
-    // ----- Obtener proxies desde fuentes (con timeout) -----
+    // ----- Obtener proxies SOCKS5 desde fuentes -----
     suspend fun fetchProxies(limit: Int = 20, timeoutMs: Int = 8000): List<Proxy> {
         val allProxies = mutableListOf<Proxy>()
         for (source in PROXY_SOURCES) {
@@ -190,29 +177,9 @@ class ProxyManager(context: Context) {
                 val reader = BufferedReader(InputStreamReader(connection.inputStream))
                 val response = reader.readText()
                 reader.close()
-                parseProxies(response, source)
+                parseTextProxies(response)
             } else { emptyList() }
         } finally { connection.disconnect() }
-    }
-
-    private fun parseProxies(response: String, source: String): List<Proxy> {
-        return if (response.trim().startsWith("[")) parseJsonProxies(response)
-        else parseTextProxies(response)
-    }
-
-    private fun parseJsonProxies(json: String): List<Proxy> {
-        val proxies = mutableListOf<Proxy>()
-        try {
-            val jsonArray = JSONArray(json)
-            for (i in 0 until jsonArray.length()) {
-                val obj = jsonArray.getJSONObject(i)
-                val protocol = obj.optString("protocol", "http").lowercase()
-                val ip = obj.optString("ip", "")
-                val port = obj.optInt("port", 0)
-                if (ip.isNotEmpty() && port > 0) proxies.add(Proxy(ip, port, protocol))
-            }
-        } catch (e: Exception) { Log.e(TAG, "Error parseando JSON: ${e.message}") }
-        return proxies
     }
 
     private fun parseTextProxies(text: String): List<Proxy> {
@@ -225,18 +192,20 @@ class ProxyManager(context: Context) {
             if (parts.size >= 2) {
                 val ip = parts[0].trim()
                 val port = parts[1].trim().toIntOrNull()
-                if (ip.isNotEmpty() && port != null && port > 0) proxies.add(Proxy(ip, port, "http"))
+                if (ip.isNotEmpty() && port != null && port > 0) {
+                    proxies.add(Proxy(ip, port, "socks5"))
+                }
             }
         }
         return proxies
     }
 
-    // ----- Probar proxy con timeout -----
+    // ----- Probar proxy SOCKS5 -----
     suspend fun testProxy(proxy: Proxy, testUrl: String = "https://httpbin.org/ip", timeoutMs: Int = 5000): Boolean {
         return try {
-            val javaProxy = java.net.Proxy(java.net.Proxy.Type.HTTP, InetSocketAddress(proxy.ip, proxy.port))
+            val socksProxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress(proxy.ip, proxy.port))
             val url = URL(testUrl)
-            val connection = url.openConnection(javaProxy) as HttpURLConnection
+            val connection = url.openConnection(socksProxy) as HttpURLConnection
             connection.connectTimeout = timeoutMs
             connection.readTimeout = timeoutMs
             connection.connect()
@@ -244,7 +213,7 @@ class ProxyManager(context: Context) {
             connection.disconnect()
             responseCode in 200..299
         } catch (e: Exception) {
-            Log.d(TAG, "Proxy ${proxy.ip}:${proxy.port} fallÃ³: ${e.message}")
+            Log.d(TAG, "Proxy SOCKS5 ${proxy.ip}:${proxy.port} fallÃ³: ${e.message}")
             false
         }
     }
