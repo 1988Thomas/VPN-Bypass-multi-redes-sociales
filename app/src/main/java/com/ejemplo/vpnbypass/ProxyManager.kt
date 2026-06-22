@@ -5,6 +5,7 @@ import org.json.JSONArray
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
+import java.net.Proxy
 import java.net.URL
 
 class ProxyManager {
@@ -19,6 +20,7 @@ class ProxyManager {
         )
     }
     data class Proxy(val ip: String, val port: Int, val protocol: String = "http")
+    
     suspend fun fetchProxies(limit: Int = 20, timeoutMs: Int = 5000): List<Proxy> {
         val allProxies = mutableListOf<Proxy>()
         for (source in PROXY_SOURCES) {
@@ -33,6 +35,7 @@ class ProxyManager {
         }
         return allProxies.distinctBy { "${it.ip}:${it.port}" }.take(limit)
     }
+    
     private fun fetchFromSource(source: String, timeoutMs: Int): List<Proxy> {
         val url = URL(source)
         val connection = url.openConnection() as HttpURLConnection
@@ -49,10 +52,12 @@ class ProxyManager {
             } else { emptyList() }
         } finally { connection.disconnect() }
     }
+    
     private fun parseProxies(response: String, source: String): List<Proxy> {
         return if (response.trim().startsWith("[")) parseJsonProxies(response)
         else parseTextProxies(response)
     }
+    
     private fun parseJsonProxies(json: String): List<Proxy> {
         val proxies = mutableListOf<Proxy>()
         try {
@@ -67,6 +72,7 @@ class ProxyManager {
         } catch (e: Exception) { Log.e(TAG, "Error parseando JSON: ${e.message}") }
         return proxies
     }
+    
     private fun parseTextProxies(text: String): List<Proxy> {
         val proxies = mutableListOf<Proxy>()
         val lines = text.split("\n")
@@ -82,17 +88,20 @@ class ProxyManager {
         }
         return proxies
     }
+    
     suspend fun testProxy(proxy: Proxy, testUrl: String = "https://httpbin.org/ip", timeoutMs: Int = 5000): Boolean {
         return try {
+            val javaProxy = Proxy(Proxy.Type.HTTP, java.net.InetSocketAddress(proxy.ip, proxy.port))
             val url = URL(testUrl)
-            val connection = url.openConnection() as java.net.HttpURLConnection
+            val connection = url.openConnection(javaProxy) as HttpURLConnection
             connection.connectTimeout = timeoutMs
             connection.readTimeout = timeoutMs
-            connection.setProxy(java.net.Proxy(java.net.Proxy.Type.HTTP, java.net.InetSocketAddress(proxy.ip, proxy.port)))
             connection.connect()
             val responseCode = connection.responseCode
             connection.disconnect()
             responseCode in 200..299
-        } catch (e: Exception) { false }
+        } catch (e: Exception) {
+            false
+        }
     }
 }
