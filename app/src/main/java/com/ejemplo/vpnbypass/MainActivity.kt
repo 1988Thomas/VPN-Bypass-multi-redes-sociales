@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Bundle
 import android.widget.Button
+import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -14,6 +15,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStart: Button
     private lateinit var btnStop: Button
     private lateinit var btnRefresh: Button
+    private lateinit var btnSetManual: Button
+    private lateinit var editManualProxy: EditText
     private lateinit var txtStatus: TextView
     private lateinit var progressBar: ProgressBar
 
@@ -30,14 +33,41 @@ class MainActivity : AppCompatActivity() {
         btnStart = findViewById(R.id.btnStart)
         btnStop = findViewById(R.id.btnStop)
         btnRefresh = findViewById(R.id.btnRefresh)
+        btnSetManual = findViewById(R.id.btnSetManual)
+        editManualProxy = findViewById(R.id.editManualProxy)
         txtStatus = findViewById(R.id.txtStatus)
         progressBar = findViewById(R.id.progressBar)
+
+        // BotÃ³n para usar proxy manual
+        btnSetManual.setOnClickListener {
+            val input = editManualProxy.text.toString().trim()
+            if (input.isEmpty()) {
+                Toast.makeText(this, "Ingresa IP:Puerto", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val parts = input.split(":")
+            if (parts.size != 2) {
+                Toast.makeText(this, "Formato incorrecto (usa IP:Puerto)", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val ip = parts[0].trim()
+            val port = parts[1].trim().toIntOrNull()
+            if (ip.isEmpty() || port == null || port <= 0) {
+                Toast.makeText(this, "IP o puerto invÃ¡lido", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val proxy = ProxyManager.Proxy(ip, port)
+            proxyManager.saveManualProxy(proxy)
+            currentProxy = proxy
+            txtStatus.text = "Proxy manual guardado: ${ip}:${port}"
+            Toast.makeText(this, "Proxy manual guardado", Toast.LENGTH_SHORT).show()
+        }
 
         btnRefresh.setOnClickListener { buscarProxy() }
 
         btnStart.setOnClickListener {
             if (currentProxy == null) {
-                Toast.makeText(this, "Primero busca un proxy valido", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Primero busca un proxy vÃ¡lido", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             val intent = VpnService.prepare(this)
@@ -47,7 +77,7 @@ class MainActivity : AppCompatActivity() {
 
         btnStop.setOnClickListener { stopVpnService() }
 
-        // Iniciar bÃºsqueda al abrir
+        // Iniciar bÃºsqueda automÃ¡tica
         txtStatus.text = "Iniciando..."
         buscarProxy()
     }
@@ -59,13 +89,12 @@ class MainActivity : AppCompatActivity() {
 
         scope.launch {
             try {
-                // Verificar si toca renovar la lista fija
+                // Verificar renovaciÃ³n
                 if (proxyManager.shouldRenewProxies()) {
                     txtStatus.text = "Renovando lista de proxies fijos..."
                     proxyManager.renewFixedProxies()
                 }
 
-                // Obtener proxy funcional (usa fijos primero)
                 val proxy = proxyManager.getWorkingProxy()
 
                 withContext(Dispatchers.Main) {
@@ -84,8 +113,8 @@ class MainActivity : AppCompatActivity() {
                         txtStatus.text = "No se encontraron proxies funcionales"
                         Toast.makeText(
                             this@MainActivity,
-                            "Intenta de nuevo mÃ¡s tarde",
-                            Toast.LENGTH_SHORT
+                            "Prueba a ingresar un proxy manualmente",
+                            Toast.LENGTH_LONG
                         ).show()
                     }
                 }

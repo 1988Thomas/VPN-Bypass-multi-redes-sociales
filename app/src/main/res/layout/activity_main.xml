@@ -39,8 +39,9 @@
                 android:textSize="14sp"
                 android:textColor="@color/secondary"
                 android:layout_gravity="center"
-                android:layout_marginBottom="24dp"/>
+                android:layout_marginBottom="16dp"/>
 
+            <!-- Estado -->
             <TextView
                 android:id="@+id/txtStatus"
                 android:layout_width="match_parent"
@@ -49,16 +50,42 @@
                 android:textSize="14sp"
                 android:textColor="@color/primary"
                 android:gravity="center"
-                android:layout_marginBottom="16dp"/>
+                android:layout_marginBottom="12dp"/>
 
             <ProgressBar
                 android:id="@+id/progressBar"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:layout_marginBottom="16dp"
+                android:layout_marginBottom="12dp"
                 android:visibility="gone"/>
 
+            <!-- Proxy manual -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <EditText
+                    android:id="@+id/editManualProxy"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="IP:Puerto (ej. 1.2.3.4:8080)"
+                    android:textSize="12sp"
+                    android:padding="8dp"
+                    android:layout_marginEnd="8dp"/>
+
+                <Button
+                    android:id="@+id/btnSetManual"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Usar"
+                    android:backgroundTint="@color/primary"/>
+            </LinearLayout>
+
+            <!-- Botones principales -->
             <Button
                 android:id="@+id/btnRefresh"
                 style="@style/Widget.AppCompat.Button.Colored"
