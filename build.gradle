@@ -4,6 +4,7 @@ buildscript {
         google()
         mavenCentral()
         maven { url 'https://jitpack.io' }
+        maven { url 'https://sagernet.org/maven/' }
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.5.0'
@@ -15,6 +16,7 @@ allprojects {
         google()
         mavenCentral()
         maven { url 'https://jitpack.io' }
+        maven { url 'https://sagernet.org/maven/' }
     }
 }
 task clean(type: Delete) {
