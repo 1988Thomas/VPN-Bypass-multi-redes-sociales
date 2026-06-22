@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
         btnRefresh.setOnClickListener { buscarProxy() }
         btnStart.setOnClickListener {
             if (currentProxy == null) {
-                Toast.makeText(this, "Primero busca un proxy vÃ¡lido", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Primero busca un proxy valido", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             val intent = VpnService.prepare(this)
@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
             val proxies = proxyManager.fetchProxies(limit = 30)
             if (proxies.isEmpty()) {
                 withContext(Dispatchers.Main) {
-                    txtStatus.text = "âŒ No se encontraron proxies"
+                    txtStatus.text = "No se encontraron proxies. Intenta de nuevo."
                     progressBar.visibility = android.view.View.GONE
                     btnRefresh.isEnabled = true
                 }
@@ -65,10 +65,10 @@ class MainActivity : AppCompatActivity() {
                 btnRefresh.isEnabled = true
                 if (workingProxy != null) {
                     currentProxy = workingProxy
-                    txtStatus.text = "âœ… Proxy activo: ${workingProxy.ip}:${workingProxy.port}"
+                    txtStatus.text = "Proxy activo: ${workingProxy.ip}:${workingProxy.port}"
                     Toast.makeText(this@MainActivity, "Proxy encontrado: ${workingProxy.ip}:${workingProxy.port}", Toast.LENGTH_SHORT).show()
                 } else {
-                    txtStatus.text = "âŒ NingÃºn proxy funcionÃ³. Intenta refrescar."
+                    txtStatus.text = "Ningun proxy funciono. Intenta refrescar."
                     Toast.makeText(this@MainActivity, "No se encontraron proxies funcionales", Toast.LENGTH_SHORT).show()
                 }
             }

@@ -36,18 +36,18 @@
         android:id="@+id/btnRefresh"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="ðŸ”„ Buscar proxy"
+        android:text="Buscar proxy"
         android:layout_marginBottom="16dp"/>
     <Button
         android:id="@+id/btnStart"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="â–¶ Activar Bypass"
+        android:text="Activar Bypass"
         android:layout_marginBottom="16dp"/>
     <Button
         android:id="@+id/btnStop"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="â¹ Detener Bypass"
+        android:text="Detener Bypass"
         android:enabled="false"/>
 </LinearLayout>

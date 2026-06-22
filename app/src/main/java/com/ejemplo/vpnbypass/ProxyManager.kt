@@ -12,16 +12,20 @@ class ProxyManager {
     companion object {
         private const val TAG = "ProxyManager"
         private val PROXY_SOURCES = listOf(
+            // Fuentes principales (con ampersands escapados para PowerShell)
             "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies`&proxy_format=protocolipport`&format=json",
             "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies`&proxy_format=protocolipport`&format=text",
             "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/http.txt",
             "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/https.txt",
-            "https://raw.githubusercontent.com/Thordata/awesome-free-proxy-list/main/proxies/all.txt"
+            "https://raw.githubusercontent.com/Thordata/awesome-free-proxy-list/main/proxies/all.txt",
+            // Fuentes adicionales
+            "https://raw.githubusercontent.com/prxchk/proxy-list/main/http.txt",
+            "https://raw.githubusercontent.com/prxchk/proxy-list/main/https.txt"
         )
     }
     data class Proxy(val ip: String, val port: Int, val protocol: String = "http")
     
-    suspend fun fetchProxies(limit: Int = 20, timeoutMs: Int = 5000): List<Proxy> {
+    suspend fun fetchProxies(limit: Int = 30, timeoutMs: Int = 8000): List<Proxy> {
         val allProxies = mutableListOf<Proxy>()
         for (source in PROXY_SOURCES) {
             try {
@@ -89,9 +93,8 @@ class ProxyManager {
         return proxies
     }
     
-    suspend fun testProxy(proxy: Proxy, testUrl: String = "https://httpbin.org/ip", timeoutMs: Int = 5000): Boolean {
+    suspend fun testProxy(proxy: Proxy, testUrl: String = "https://httpbin.org/ip", timeoutMs: Int = 8000): Boolean {
         return try {
-            // Usar nombre completo para evitar conflicto con nuestra clase Proxy
             val javaProxy = java.net.Proxy(java.net.Proxy.Type.HTTP, java.net.InetSocketAddress(proxy.ip, proxy.port))
             val url = URL(testUrl)
             val connection = url.openConnection(javaProxy) as HttpURLConnection
